@@ -1,0 +1,35 @@
+# 创建文件：.github/workflows/build-microlua.yml
+name: Build MicroLua for RP2040
+
+on:
+  workflow_dispatch:  # 手动触发
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        submodules: recursive
+        
+    - name: Set up environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake gcc-arm-none-eabi libnewlib-arm-none-eabi
+        
+    - name: Build MicroLua
+      run: |
+        mkdir build
+        cd build
+        cmake -DPICO_BOARD=pico -DPICO_BUILD_PICOTOOL=OFF -DBUILD_TESTING=OFF ..
+        make -j4
+        
+    - name: Upload UF2 artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: microlua-firmware
+        path: build/microlua.uf2
