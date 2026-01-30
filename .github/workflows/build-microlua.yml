@@ -1,4 +1,4 @@
-# .github/workflows/build-microlua.yml
+# 更新 .github/workflows/build-microlua.yml
 name: Build MicroLua for RP2040
 
 on:
@@ -16,32 +16,35 @@ jobs:
       with:
         submodules: recursive
         
-    - name: Set up environment
+    - name: Set up correct ARM toolchain
       run: |
+        # 安装正确的工具链
         sudo apt-get update
         sudo apt-get install -y cmake gcc-arm-none-eabi libnewlib-arm-none-eabi
+        # 验证版本
+        arm-none-eabi-gcc --version
         
-    - name: Fix inttypes.h issue before build
+    - name: Fix ARM assembly flags
       run: |
-        # 修复 mlua.int64.c 文件
-        find . -name "*.c" -type f -exec grep -l "PRId64\|PRIx64" {} \;
+        # 修复汇编器标志
+        echo "设置正确的汇编标志..."
+        # 在编译前设置环境变量
+        export CFLAGS="-mcpu=cortex-m0plus -mthumb -Os"
+        export CXXFLAGS="-mcpu=cortex-m0plus -mthumb -Os"
+        export ASFLAGS="-mcpu=cortex-m0plus -mthumb"
         
-        # 如果找到了，手动添加头文件包含
-        for file in $(find . -name "*.c" -type f -exec grep -l "PRId64\|PRIx64" {} \;) ; do
-          echo "修复文件: $file"
-          # 在包含 mlua/module.h 的行后添加 #include <inttypes.h>
-          sed -i '/#include "mlua\/module.h"/a #include <inttypes.h>' "$file" 2>/dev/null || true
-        done
-        
-    - name: Build MicroLua
+    - name: Build with correct flags
       run: |
         mkdir -p build
         cd build
-        # 只编译主目标，跳过测试
+        # 强制使用正确的 CPU 架构
         cmake -DPICO_BOARD=pico \
               -DPICO_BUILD_PICOTOOL=OFF \
               -DBUILD_TESTING=OFF \
-              -DCMAKE_C_FLAGS="-D__STDC_FORMAT_MACROS" ..
+              -DCMAKE_C_FLAGS="-mcpu=cortex-m0plus -mthumb -Os" \
+              -DCMAKE_CXX_FLAGS="-mcpu=cortex-m0plus -mthumb -Os" \
+              -DCMAKE_ASM_FLAGS="-mcpu=cortex-m0plus -mthumb" \
+              ..
         make microlua -j4
         
     - name: Upload UF2 artifact
@@ -49,3 +52,4 @@ jobs:
       with:
         name: microlua-firmware
         path: build/microlua.uf2
+        retention-days: 90
